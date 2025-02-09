@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Model Store</title>
+    <script src="https://cdn.jsdelivr.net/npm/@google/model-viewer@latest"></script>
+    <script src="https://stuk.github.io/jszip/dist/jszip.min.js"></script>
+    <script src="https://stuk.github.io/jszip/vendor/FileSaver.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to right, #2c3e50, #4ca1af);
+            color: white;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background: #1a1a2e;
+            padding: 15px;
+            font-size: 1.5em;
+        }
+        nav ul {
+            list-style: none;
+            padding: 0;
+        }
+        nav ul li {
+            display: inline;
+            margin: 0 15px;
+        }
+        nav ul li a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        section {
+            display: none;
+            padding: 20px;
+        }
+        #home {
+            display: block;
+        }
+        .product-list {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .product {
+            background: white;
+            color: black;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px;
+            text-align: center;
+            width: 220px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .product img {
+            max-width: 100%;
+            border-radius: 5px;
+        }
+        model-viewer {
+            width: 100%;
+            height: 200px;
+        }
+        .button {
+            width: 100%;
+            margin-top: 10px;
+            padding: 10px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 14px;
+            color: white;
+        }
+        .cart-btn { background: #ff5e62; }
+        .cart-btn:hover { background: #ff9966; }
+        .remove-btn { background: #dc3545; }
+        .remove-btn:hover { background: #c82333; }
+        .download-btn { background: #28a745; }
+        .download-btn:hover { background: #218838; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>3D Model Store</h1>
+        <nav>
+            <ul>
+                <li><a onclick="showSection('home')">Home</a></li>
+                <li><a onclick="showSection('products')">Products</a></li>
+                <li><a onclick="showSection('cart')">Cart (<span id="cart-count">0</span>)</a></li>
+                <li><a onclick="showSection('import')">Upload</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <section id="home">
+        <h2>🏠 Home</h2>
+        <p>Discover and buy high-quality 3D models.</p>
+        <div id="home-models" class="product-list"></div>
+    </section>
+
+    <section id="products">
+        <h2>🛒 Products</h2>
+        <div id="product-list" class="product-list"></div>
+    </section>
+
+    <section id="cart">
+        <h2>🛍️ Your Cart</h2>
+        <div id="cart-items"></div>
+    </section>
+
+    <section id="import">
+        <h2>📤 Upload 3D Model</h2>
+        <input type="file" id="model-file" accept=".glb,.gltf"><br>
+        <input type="file" id="image-file" accept="image/*"><br>
+        <input type="text" id="model-name" placeholder="Enter Model Name"><br>
+        <button onclick="publishModel()">Publish</button>
+    </section>
+
+    <script>
+        let products = [];
+        let cart = JSON.parse(localStorage.getItem("cart")) || [];
+
+        function showSection(sectionId) {
+            document.querySelectorAll("section").forEach(sec => sec.style.display = "none");
+            document.getElementById(sectionId).style.display = "block";
+            updateCart();
+        }
+
+        function publishModel() {
+            const modelFile = document.getElementById("model-file").files[0];
+            const previewFile = document.getElementById("image-file").files[0];
+            const modelName = document.getElementById("model-name").value;
+
+            if (!modelFile || !previewFile || !modelName) {
+                alert("⚠️ Please upload all files and enter a model name.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const imgSrc = event.target.result;
+                const newProduct = { name: modelName, image: imgSrc, model: URL.createObjectURL(modelFile), file: modelFile };
+
+                products.push(newProduct);
+                updateHomePage();
+                updateProductsPage();
+                alert("✅ Model published successfully!");
+            };
+
+            reader.readAsDataURL(previewFile);
+        }
+
+        function updateHomePage() {
+            const homeModels = document.getElementById("home-models");
+            homeModels.innerHTML = "";
+            products.forEach((product, index) => {
+                homeModels.innerHTML += `
+                    <div class="product">
+                        <img src="${product.image}" alt="${product.name}">
+                        <h3>${product.name}</h3>
+                        <button class="button cart-btn" onclick="addToCart(${index})">Add to Cart</button>
+                    </div>`;
+            });
+        }
+
+        function updateProductsPage() {
+            const productList = document.getElementById("product-list");
+            productList.innerHTML = "";
+            products.forEach((product, index) => {
+                productList.innerHTML += `
+                    <div class="product">
+                        <model-viewer src="${product.model}" ar ar-modes="webxr scene-viewer quick-look" camera-controls auto-rotate></model-viewer>
+                        <h3>${product.name}</h3>
+                        <button class="button cart-btn" onclick="addToCart(${index})">Add to Cart</button>
+                    </div>`;
+            });
+        }
+
+        function addToCart(index) {
+            cart.push(products[index]);
+            localStorage.setItem("cart", JSON.stringify(cart));
+            updateCart();
+            alert(`✅ ${products[index].name} added to cart!`);
+        }
+
+        function updateCart() {
+            const cartItems = document.getElementById("cart-items");
+            const cartCount = document.getElementById("cart-count");
+            cartItems.innerHTML = "";
+            cart.forEach((product, index) => {
+                cartItems.innerHTML += `
+                    <div class="product">
+                        <model-viewer src="${product.model}" ar ar-modes="webxr scene-viewer quick-look" camera-controls auto-rotate></model-viewer>
+                        <h3>${product.name}</h3>
+                        <button class="button remove-btn" onclick="removeFromCart(${index})">Remove</button>
+                    </div>`;
+            });
+            cartCount.innerText = cart.length;
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            localStorage.setItem("cart", JSON.stringify(cart));
+            updateCart();
+            alert("❌ Item removed from cart.");
+        }
+
+        function clearCart() {
+            cart = [];
+            localStorage.setItem("cart", JSON.stringify(cart));
+            updateCart();
+            alert("🛒 Cart cleared!");
+        }
+
+        updateCart();
+    </script>
+</body>
+</html>
+
+<h1></h1>
